@@ -14,6 +14,9 @@ APPROVALS_COLLECTION = "approvals"
 
 logger = logging.getLogger(__name__)
 
+import os
+import json
+
 # ─── INISIALISASI FIREBASE ───────────────────────────────────
 _db = None
 
@@ -21,7 +24,15 @@ def init_firebase():
     """Inisialisasi koneksi Firebase. Panggil sekali saat bot start."""
     global _db
     try:
-        cred = credentials.Certificate(FIREBASE_CRED_PATH)
+        firebase_key_env = os.getenv("FIREBASE_KEY")
+        if firebase_key_env:
+            logger.info("Membaca Firebase Service Account dari Environment Variable (FIREBASE_KEY)...")
+            firebase_key_dict = json.loads(firebase_key_env)
+            cred = credentials.Certificate(firebase_key_dict)
+        else:
+            logger.info("Membaca Firebase Service Account dari file config (serviceAccountKey.json)...")
+            cred = credentials.Certificate(FIREBASE_CRED_PATH)
+            
         firebase_admin.initialize_app(cred)
         _db = firestore.client()
         logger.info("✅ Firebase berhasil diinisialisasi.")
