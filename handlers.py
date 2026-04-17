@@ -52,6 +52,9 @@ async def check_user_status(message: Message, send_warning: bool = True, user_id
 
 async def check_limit(user: dict, message: Message) -> bool:
     """Cek apakah user mencapai limit harian. Return True jika bisa lanjut."""
+    # Admin dan premium selalu bypass limit
+    if user.get("user_id") in config.ADMIN_IDS:
+        return True
     if user.get("is_premium"):
         return True
         
@@ -168,20 +171,29 @@ async def cmd_report(message: Message, bot: Bot):
 @router.message(Command("approv"))
 async def cmd_approv(message: Message):
     """[Admin] Proses persetujuan langganan"""
-    if message.from_user.id not in config.ADMIN_IDS:
-        return
-        
-    approvals = await db.get_pending_approvals(limit=1)
-    if not approvals:
-        await message.answer("🎉 Tidak ada antrean persetujuan pembayaran saat ini!")
-        return
-        
-    data = approvals[0]
-    target_id = data["user_id"]
-    file_id = data["file_id"]
+    user_id = message.from_user.id
+    logger.info(f"[APPROV] Dipanggil oleh user_id={user_id}, ADMIN_IDS={config.ADMIN_IDS}")
     
-    txt = f"💳 **Review Pembayaran Baru**\nID User: `{target_id}`\nTanggal: {data['timestamp']}"
-    await message.answer_photo(file_id, caption=txt, parse_mode="Markdown", reply_markup=utils.approval_keyboard(target_id))
+    if user_id not in config.ADMIN_IDS:
+        logger.warning(f"[APPROV] Ditolak: {user_id} bukan admin.")
+        return
+    
+    try:
+        approvals = await db.get_pending_approvals(limit=1)
+        if not approvals:
+            await message.answer("🎉 Tidak ada antrean persetujuan pembayaran saat ini!")
+            return
+            
+        data = approvals[0]
+        target_id = data["user_id"]
+        file_id = data["file_id"]
+        
+        txt = f"💳 *Review Pembayaran Baru*\nID User: `{target_id}`\nTanggal: {data['timestamp']}"
+        await message.answer_photo(file_id, caption=txt, parse_mode="Markdown", reply_markup=utils.approval_keyboard(target_id))
+        logger.info(f"[APPROV] Berhasil tampilkan approval untuk user {target_id}")
+    except Exception as e:
+        logger.error(f"[APPROV] Error: {e}")
+        await message.answer(f"❌ Error saat memproses approval: {e}")
 
 
 # ─── ADMIN COMMANDS ───────────────────────────────────────────
