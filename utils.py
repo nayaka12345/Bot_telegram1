@@ -136,6 +136,33 @@ def waiting_keyboard() -> InlineKeyboardMarkup:
     return keyboard
 
 
+def vip_find_keyboard() -> InlineKeyboardMarkup:
+    """
+    Keyboard khusus user VIP/Premium saat memilih mode Find.
+    Memberikan pilihan filter: random, gender, kota, atau keduanya.
+    """
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🎲 Random", callback_data="vip_find_random"),
+        ],
+        [
+            InlineKeyboardButton(text="👦 Cari Cowok", callback_data="vip_find_gender_male"),
+            InlineKeyboardButton(text="👧 Cari Cewek", callback_data="vip_find_gender_female"),
+        ],
+        [
+            InlineKeyboardButton(text="🏙️ Satu Kota", callback_data="vip_find_kota"),
+        ],
+        [
+            InlineKeyboardButton(text="👦🏙️ Cowok Satu Kota", callback_data="vip_find_male_kota"),
+            InlineKeyboardButton(text="👧🏙️ Cewek Satu Kota", callback_data="vip_find_female_kota"),
+        ],
+        [
+            InlineKeyboardButton(text="❌ Batal", callback_data="action_stop"),
+        ],
+    ])
+    return keyboard
+
+
 def confirm_keyboard() -> InlineKeyboardMarkup:
     """Keyboard konfirmasi aksi (ya/tidak)."""
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -268,11 +295,25 @@ def format_match_notification(purpose: str) -> str:
         f"Mulai ngobrol sekarang 👇"
     )
 
-def format_searching_message(is_premium: bool) -> str:
+def format_searching_message(is_premium: bool, target_gender: str = None, target_location: bool = False) -> str:
     """Format pesan saat sedang mencari partner."""
-    if is_premium:
-        return "🔍 Mencari teman ngobrol...\nKamu akan dipasangkan dengan orang dari kota yang sama 🔥 (Premium Feature)"
-    return "🔍 Mencari teman ngobrol..."
+    if not is_premium:
+        return "🔍 Mencari teman ngobrol..."
+    
+    # Buat deskripsi filter yang aktif
+    filters = []
+    if target_gender == "male":
+        filters.append("👦 Cowok")
+    elif target_gender == "female":
+        filters.append("👧 Cewek")
+    if target_location:
+        filters.append("🏙️ Satu Kota")
+    
+    if filters:
+        filter_text = " + ".join(filters)
+        return f"🔍 Mencari teman ngobrol...\n✨ Filter aktif: {filter_text} (Premium)"
+    
+    return "🔍 Mencari teman ngobrol... (Premium)"
 
 
 def format_limit_warning(daily_count: int, limit: int) -> str:

@@ -324,7 +324,73 @@ async def callback_city(call: CallbackQuery):
 @router.callback_query(F.data == "action_find")
 async def callback_find(call: CallbackQuery):
     await call.answer()
+    user_id = call.from_user.id
+    
+    # Cek admin langsung dari config (tanpa perlu cache)
+    is_admin = user_id in config.ADMIN_IDS
+    
+    # Cek premium dari cache RAM (jika sudah ter-cache)
+    user = match.get_cached_user(user_id)
+    is_premium = is_admin or (user is not None and (user.get("is_premium") or utils.get_user_limit(user) == config.PREMIUM_CHAT_LIMIT))
+    
+    if is_premium and not match.has_partner(user_id) and not match.is_in_queue(user_id):
+        await call.message.answer(
+            "👑 *Mode Find Premium*\nPilih filter pencarian kamu:",
+            parse_mode="Markdown",
+            reply_markup=utils.vip_find_keyboard()
+        )
+    else:
+        await handle_find_action(call.message, user_id)
+
+
+# ─── VIP FIND CALLBACKS ───────────────────────────────────────
+
+@router.callback_query(F.data == "vip_find_random")
+async def callback_vip_find_random(call: CallbackQuery):
+    """VIP: Cari random tanpa filter."""
+    await call.answer()
+    await call.message.delete()
     await handle_find_action(call.message, call.from_user.id)
+
+
+@router.callback_query(F.data == "vip_find_gender_male")
+async def callback_vip_find_male(call: CallbackQuery):
+    """VIP: Cari khusus cowok."""
+    await call.answer()
+    await call.message.delete()
+    await handle_find_action(call.message, call.from_user.id, target_gender="male")
+
+
+@router.callback_query(F.data == "vip_find_gender_female")
+async def callback_vip_find_female(call: CallbackQuery):
+    """VIP: Cari khusus cewek."""
+    await call.answer()
+    await call.message.delete()
+    await handle_find_action(call.message, call.from_user.id, target_gender="female")
+
+
+@router.callback_query(F.data == "vip_find_kota")
+async def callback_vip_find_kota(call: CallbackQuery):
+    """VIP: Cari yang satu kota."""
+    await call.answer()
+    await call.message.delete()
+    await handle_find_action(call.message, call.from_user.id, target_location=True)
+
+
+@router.callback_query(F.data == "vip_find_male_kota")
+async def callback_vip_find_male_kota(call: CallbackQuery):
+    """VIP: Cari cowok satu kota."""
+    await call.answer()
+    await call.message.delete()
+    await handle_find_action(call.message, call.from_user.id, target_gender="male", target_location=True)
+
+
+@router.callback_query(F.data == "vip_find_female_kota")
+async def callback_vip_find_female_kota(call: CallbackQuery):
+    """VIP: Cari cewek satu kota."""
+    await call.answer()
+    await call.message.delete()
+    await handle_find_action(call.message, call.from_user.id, target_gender="female", target_location=True)
 
 
 @router.callback_query(F.data == "action_stop")
@@ -606,7 +672,7 @@ async def handle_find_action(message, user_id: int, target_gender: str = None, t
         await message.answer("Ups! Sayangnya filter kriteria spesifik (gender/kota) hanyalah fitur *VIP/Premium*.\nKetik /upgrade untuk berlangganan.", parse_mode="Markdown")
         return
         
-    msg_text = utils.format_searching_message(is_premium)
+    msg_text = utils.format_searching_message(is_premium, target_gender, target_location)
     await message.answer(msg_text, reply_markup=utils.waiting_keyboard())
     
     # Tarik instance bot jika dibutuhkan dari message dict
