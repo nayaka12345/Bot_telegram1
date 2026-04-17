@@ -1,0 +1,28 @@
+# Secret Files & Keys
+serviceAccountKey.json
+.env
+
+# Logs
+*.log
+bot.log
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# IDE & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Any random media files that aren't template
+# qris.jpg # Uncomment this if you don't want to expose your QRIS image publically
