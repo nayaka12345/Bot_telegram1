@@ -31,7 +31,7 @@ pending_dirty: set[int] = set()
 
 # ─── MANAJEMEN ANTRIAN ────────────────────────────────────────
 
-def add_to_queue(user_id: int, purpose: str, gender: str, province: str, city: str, is_premium: bool = False):
+def add_to_queue(user_id: int, purpose: str, gender: str, province: str, city: str, is_premium: bool = False, target_gender: str = None, target_location: bool = False):
     """
     Tambahkan user ke antrian waiting.
     Pastikan tidak ada duplikat.
@@ -46,6 +46,8 @@ def add_to_queue(user_id: int, purpose: str, gender: str, province: str, city: s
         "province": province,
         "city": city,
         "is_premium": is_premium,
+        "target_gender": target_gender,
+        "target_location": target_location
     })
     logger.debug(f"🔍 User {user_id} masuk antrian. Total: {len(waiting_queue)}")
 
@@ -89,6 +91,17 @@ def find_match(seeker: dict) -> Optional[dict]:
     """
     candidates = [u for u in waiting_queue if u["user_id"] != seeker["user_id"]]
     
+    if not candidates:
+        return None
+        
+    # Filter target eksplisit (VIP feature)
+    if seeker.get("target_gender"):
+        candidates = [u for u in candidates if u["gender"] == seeker["target_gender"]]
+        
+    if seeker.get("target_location"):
+        # Cari yang kota atau provinsinya sama persis
+        candidates = [u for u in candidates if u["city"] == seeker.get("city") or u["province"] == seeker.get("province")]
+        
     if not candidates:
         return None
     

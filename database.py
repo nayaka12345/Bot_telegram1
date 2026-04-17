@@ -259,3 +259,13 @@ async def delete_payment_proof(user_id: int) -> bool:
     except Exception as e:
         logger.error(f"❌ Gagal menghapus payment proof user ({user_id}): {e}")
         return False
+
+async def get_all_users() -> list[dict]:
+    """Ambil semua data user dari Firebase. Berguna untuk broadcast."""
+    try:
+        db = get_db()
+        docs = db.collection(FIREBASE_COLLECTION).stream()
+        return [doc.to_dict() for doc in docs]
+    except Exception as e:
+        logger.error(f"❌ Gagal get_all_users: {e}")
+        return []

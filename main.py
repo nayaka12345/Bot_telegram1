@@ -12,8 +12,10 @@ from aiogram.enums import ParseMode
 import config
 import database as db
 import matching as match
+import utils
 from handlers import router
 from utils import setup_logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,51 @@ async def auto_save_task():
             logger.error(f"❌ Error saat auto-save: {e}")
 
 
+async def auto_reminder_task(bot: Bot):
+    """
+    Background worker untuk mengirimkan pesan pengingat ke user pasif (enggak aktif >= 3 hari).
+    Berjalan setiap 24 jam.
+    """
+    logger.info("🕒 Auto-reminder worker started.")
+    await asyncio.sleep(60) # Beri jeda 1 menit setelah bot on sebelum ngecek
+    while True:
+        try:
+            users = await db.get_all_users()
+            now = datetime.now()
+            count = 0
+            
+            for u in users:
+                if u.get("banned") or u["user_id"] in config.ADMIN_IDS:
+                    continue
+                    
+                updated_at_str = u.get("updated_at")
+                if updated_at_str:
+                    try:
+                        updated_at = datetime.fromisoformat(updated_at_str)
+                        days_inactive = (now - updated_at).days
+                        
+                        if days_inactive >= 3 and days_inactive < 7: # Ingatkan user yang tidak aktif 3-6 hari aja
+                            await bot.send_message(
+                                u["user_id"],
+                                "Halo kak! Malam mingguan atau sendirian aja nih? Yuk mending nyari teman ngobrol di sini! 😁",
+                                reply_markup=utils.main_keyboard()
+                            )
+                            count += 1
+                            await asyncio.sleep(0.05) # Prevent Telegram Rate Limit
+                    except Exception:
+                        pass
+            
+            if count > 0:
+                logger.info(f"🔔 Reminder berhasil dikirim ke {count} user pasif.")
+                
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"❌ Error saat merun auto-reminder: {e}")
+            
+        await asyncio.sleep(86400) # Loop lagi besok (24 jam)
+
+
 async def on_startup(bot: Bot):
     """Fungsi yang dijalankan saat bot pertama kali nyala."""
     logger.info("🚀 Memulai bot Telegram Anonymous Chat...")
@@ -54,12 +101,13 @@ async def on_startup(bot: Bot):
     logger.info("✅ Bot siap melayani pengguna!")
 
 
-async def on_shutdown(bot: Bot, bg_task: asyncio.Task):
+async def on_shutdown(bot: Bot, tasks: list[asyncio.Task]):
     """Fungsi yang dijalankan saat bot dimatikan."""
     logger.info("⚠️ Mematikan bot...")
     
-    # Batalkan auto-save
-    bg_task.cancel()
+    # Batalkan semua background task
+    for t in tasks:
+        t.cancel()
     
     # Simpan data terakhir sebelum mati
     dirty_users = match.get_dirty_users()
@@ -91,15 +139,16 @@ async def main():
     dp.include_router(router)
     
     # Jalankan background task
-    bg_task = asyncio.create_task(auto_save_task())
+    bg_save = asyncio.create_task(auto_save_task())
+    bg_remind = asyncio.create_task(auto_reminder_task(bot))
+    bg_tasks = [bg_save, bg_remind]
     
     # Register lifecycle hooks
     dp.startup.register(on_startup)
     
-    # Saat dimatikan, kita pakai shutdown hook khusus yang membawa parameter bg_task
-    # Harus di-wrap manual karena parameter extra
+    # Saat dimatikan, batalkan background task
     async def shutdown_wrapper(dispatcher: Dispatcher, bot: Bot):
-        await on_shutdown(bot, bg_task)
+        await on_shutdown(bot, bg_tasks)
     dp.shutdown.register(shutdown_wrapper)
 
     try:

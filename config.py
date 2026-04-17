@@ -85,8 +85,21 @@ Nikmati fitur eksklusif:
 ✅ Pilih partner berdasarkan gender
 ✅ No ads
 ✅ Badge Premium ⭐
+  
+💎 VIP Membership
 
-💰 *Harga:* Rp 60.000 / bulan
+🔥 Diskon Spesial 
+
+❌ ~Rp25.000~  
+✅ Rp10.000 / hari ⭐
+
+❌ ~Rp49.000~  
+✅ Rp35.000 / minggu (BEST 🔥)
+
+❌ ~Rp70.000~  
+✅ Rp40.000 / VIP PRO Bulan 💎
+
+⚡ Hemat hingga 30%!
 
 📱 *Cara Pembayaran:*
 Menerima berbagai metode pembayaran via QRIS dan Transfer:

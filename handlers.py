@@ -96,7 +96,18 @@ async def cmd_start(message: Message):
 @router.message(Command("find"))
 async def cmd_find(message: Message):
     """Mulai mencari partner via command"""
-    await handle_find_action(message, message.from_user.id)
+    args = message.text.split()
+    target_gender = None
+    target_location = False
+    
+    if len(args) > 1:
+        param = args[1].lower()
+        if param in ["cowok", "cewek"]:
+            target_gender = "male" if param == "cowok" else "female"
+        elif param == "kota":
+            target_location = True
+            
+    await handle_find_action(message, message.from_user.id, target_gender, target_location)
 
 
 @router.message(Command("stop"))
@@ -174,6 +185,35 @@ async def cmd_approv(message: Message):
 
 
 # ─── ADMIN COMMANDS ───────────────────────────────────────────
+
+import asyncio
+
+@router.message(Command("broadcast"))
+async def cmd_broadcast(message: Message, bot: Bot):
+    """[Admin] Kirim broadcast ke semua user teregistrasi."""
+    if message.from_user.id not in config.ADMIN_IDS:
+        return
+        
+    text = message.text.replace("/broadcast ", "", 1).strip()
+    if not text or text == "/broadcast":
+        await message.answer("Format: /broadcast <pesan text/caption>")
+        return
+        
+    users = await db.get_all_users()
+    await message.answer(f"⏳ Sedang mengirim pesan broadcast ke {len(users)} pengguna...")
+    
+    success = 0
+    fail = 0
+    for u in users:
+        try:
+            # Gunakan copy_to agar semua format (gambar/video dll) bisa di broadcast
+            await message.copy_to(chat_id=u["user_id"])
+            success += 1
+            await asyncio.sleep(0.05) # Cegah rate-limit
+        except Exception:
+            fail += 1
+            
+    await message.answer(f"✅ Broadcast Selesai!\nBerhasil terkirim: {success}\nGagal (diblokir): {fail}")
 
 @router.message(Command("setpremium"))
 async def cmd_setpremium(message: Message):
@@ -276,9 +316,8 @@ async def callback_city(call: CallbackQuery):
         
     match.update_cached_user(user_id, {"city": city, "registered": True, "registration_step": None})
     await call.message.edit_text(
-        "✅ Profil kamu sudah disetup!\n"
-        "Siap mencari teman ngobrol?",
-        reply_markup=utils.main_keyboard()
+        "Yeayy... kamu sudah selesai daftar!\nCari teman ngobrol sekarang yuk 👇",
+        reply_markup=utils.post_register_keyboard()
     )
 
 
@@ -392,11 +431,31 @@ async def callback_confirm_report(call: CallbackQuery, bot: Bot):
     )
 
 
+@router.callback_query(F.data.startswith("feedback_"))
+async def callback_feedback(call: CallbackQuery, bot: Bot):
+    """Menangani review chat saat partner left"""
+    parts = call.data.split("_")
+    action = parts[1] # nakal / nyaman / aman
+    partner_id = int(parts[2])
+    
+    if action == "aman":
+        await call.message.edit_text("Syukurlah! Semoga obrolan selanjutnya lebih seru ya 😊")
+        return
+        
+    # Jika review negatif
+    await call.message.edit_text("😭 Jahat banget\n🥺 Nailong sedih dengernya...\nKami akan coba jaga kamu lebih baik ya 💛")
+    
+    # Daftarkan report
+    reports = await db.increment_report(partner_id)
+    if reports >= config.MAX_REPORTS_BEFORE_BAN:
+        await db.ban_user(partner_id)
+        match.update_cached_user(partner_id, {"banned": True})
+
 # ─── MESSAGE RELAY (CHAT ENGINE) ───────────────────────────────
 
 @router.message(F.photo)
-async def handle_photo_upload(message: Message):
-    """Menangani upload foto (bukti pembayaran)"""
+async def handle_photo_upload(message: Message, bot: Bot):
+    """Menangani upload foto (bukti pembayaran atau relay)"""
     user_id = message.from_user.id
     user = match.get_cached_user(user_id)
     
@@ -410,10 +469,8 @@ async def handle_photo_upload(message: Message):
             await message.answer("❌ Gagal menyimpan bukti. Silakan coba kirim ulang foto.")
         return
 
-    # Jika sedang chat, tolak pengiriman gambar
-    partner_id = match.get_partner(user_id)
-    if partner_id:
-        await message.answer("Tolong kirimkan pesan teks biasa saja.")
+    # Jika bukan lagi antre bayar, relay gambarnya
+    await relay_message(message, bot)
 
 @router.message(~F.text.startswith('/'))  # Tangkap semua pesan teks selain command
 async def relay_message(message: Message, bot: Bot):
@@ -425,17 +482,17 @@ async def relay_message(message: Message, bot: Bot):
     user = match.get_cached_user(user_id)
     if user and user.get("registration_step"):
         step = user["registration_step"]
-        text = message.text.strip()[:50]  # Batasi 50 karakter
-        
-        if step == "awaiting_province":
-            match.update_cached_user(user_id, {"province": text, "registration_step": None})
-            await message.answer("Pilih kota tempat tinggalmu:", reply_markup=utils.city_keyboard(text))
-        elif step == "awaiting_city":
-            match.update_cached_user(user_id, {"city": text, "registered": True, "registration_step": None})
-            await message.answer(
-                "✅ Profil kamu sudah disetup!\nSiap mencari teman ngobrol?",
-                reply_markup=utils.main_keyboard()
-            )
+        if message.text:
+            text = message.text.strip()[:50]  # Batasi 50 karakter
+            if step == "awaiting_province":
+                match.update_cached_user(user_id, {"province": text, "registration_step": None})
+                await message.answer("Pilih kota tempat tinggalmu:", reply_markup=utils.city_keyboard(text))
+            elif step == "awaiting_city":
+                match.update_cached_user(user_id, {"city": text, "registered": True, "registration_step": None})
+                await message.answer(
+                    "Yeayy... kamu sudah selesai daftar!\nCari teman ngobrol sekarang yuk 👇",
+                    reply_markup=utils.post_register_keyboard()
+                )
         return
 
     if not partner_id:
@@ -448,24 +505,25 @@ async def relay_message(message: Message, bot: Bot):
         return
         
     # Ada partner, kirim pesan ke sana
-    text = message.text
-    if text:
-        text = utils.sanitize_message(text)
-        try:
-            await bot.send_message(partner_id, f"📝 Partner:\n{text}")
-        except Exception as e:
-            logger.error(f"Gagal relay pesan dari {user_id} ke {partner_id}: {e}")
-            # Bila gagal, asumsikan partner blocked bot, putus sesi
-            await handle_stop_action(message, user_id)
-            await message.answer("Partner sepertinya terputus. Sesi dihentikan.")
+    try:
+        await message.copy_to(partner_id)
+    except Exception as e:
+        logger.error(f"Gagal relay pesan/media dari {user_id} ke {partner_id}: {e}")
+        # Bila gagal, asumsikan partner blocked bot, putus sesi
+        await handle_stop_action(message, user_id)
+        await message.answer("Partner sepertinya terputus. Sesi dihentikan.")
             
 
 # ─── LOGIC HANDLERS (ACTION HELPERS) ──────────────────────────
 
-async def try_matchmaking(seeker_user_id: int, bot: Bot):
+async def try_matchmaking(seeker_user_id: int, bot: Bot, target_gender: str = None, target_location: bool = False):
     """Proses utama matching algorithm."""
     seeker = match.get_cached_user(seeker_user_id)
     if not seeker: return
+    
+    # Masukkan filter VIP ke seeker sebelum mencari
+    seeker["target_gender"] = target_gender
+    seeker["target_location"] = target_location
     
     # 1. Cari kandidat
     partner = match.find_match(seeker)
@@ -478,7 +536,9 @@ async def try_matchmaking(seeker_user_id: int, bot: Bot):
             seeker.get("gender", ""), 
             seeker.get("province", ""),
             seeker.get("city", ""),
-            seeker.get("is_premium", False)
+            seeker.get("is_premium", False),
+            target_gender,
+            target_location
         )
         return
         
@@ -520,7 +580,7 @@ async def try_matchmaking(seeker_user_id: int, bot: Bot):
         if w: await bot.send_message(partner_id, w, parse_mode="Markdown")
 
 
-async def handle_find_action(message, user_id: int):
+async def handle_find_action(message, user_id: int, target_gender: str = None, target_location: bool = False):
     """Logika saat user klik/ketik Find"""
     user = await check_user_status(message, user_id=user_id)
     if not user: return
@@ -541,13 +601,18 @@ async def handle_find_action(message, user_id: int):
         return
         
     is_premium = user.get("is_premium") or utils.get_user_limit(user) == config.PREMIUM_CHAT_LIMIT
+    
+    if (target_gender or target_location) and not is_premium:
+        await message.answer("Ups! Sayangnya filter kriteria spesifik (gender/kota) hanyalah fitur *VIP/Premium*.\nKetik /upgrade untuk berlangganan.", parse_mode="Markdown")
+        return
+        
     msg_text = utils.format_searching_message(is_premium)
     await message.answer(msg_text, reply_markup=utils.waiting_keyboard())
     
     # Tarik instance bot jika dibutuhkan dari message dict
     bot = message.bot or message.message.bot if hasattr(message, "message") else message._bot
     if bot:
-        await try_matchmaking(user_id, bot)
+        await try_matchmaking(user_id, bot, target_gender, target_location)
 
 
 async def handle_stop_action(message, user_id: int):
@@ -561,12 +626,21 @@ async def handle_stop_action(message, user_id: int):
     # Akhiri sesi chat jika ada
     partner_id = match.end_session(user_id)
     if partner_id:
-        await message.answer("🛑 Anda telah mengakhiri percakapan.\nKetik /find atau /next untuk mencari partner baru.", reply_markup=utils.main_keyboard())
+        fb_msg = "😢 Teman ngobrolmu sudah pergi...\nApakah semuanya baik-baik saja?"
+        
+        await message.answer(
+            fb_msg, 
+            reply_markup=utils.feedback_keyboard(partner_id)
+        )
         
         bot = message.bot or message.message.bot if hasattr(message, "message") else getattr(message, "bot", None)
         if bot:
             try:
-                await bot.send_message(partner_id, "🛑 Partner telah mengakhiri percakapan.\nKetik /find atau /next untuk mencari partner baru.", reply_markup=utils.main_keyboard())
+                await bot.send_message(
+                    partner_id, 
+                    fb_msg, 
+                    reply_markup=utils.feedback_keyboard(user_id)
+                )
             except Exception:
                 pass
     else:

@@ -157,6 +157,27 @@ def approval_keyboard(target_user_id: int) -> InlineKeyboardMarkup:
     return keyboard
 
 
+def post_register_keyboard() -> InlineKeyboardMarkup:
+    """Pilihan ringkas pasca registrasi."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Mulai Cari Partner (/start)", callback_data="action_find"),
+            InlineKeyboardButton(text="Berhenti (/stop)", callback_data="action_stop"),
+        ],
+    ])
+    return keyboard
+
+
+def feedback_keyboard(partner_id: int) -> InlineKeyboardMarkup:
+    """Feedback keyboard setelah partner pergi."""
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="😭 Dia nakal", callback_data=f"feedback_nakal_{partner_id}")],
+        [InlineKeyboardButton(text="😕 Kurang nyaman", callback_data=f"feedback_nyaman_{partner_id}")],
+        [InlineKeyboardButton(text="😊 Aman kok", callback_data=f"feedback_aman_{partner_id}")],
+    ])
+    return keyboard
+
+
 # ─── RANDOM CONTENT ───────────────────────────────────────────
 
 def get_random_starter() -> str:
