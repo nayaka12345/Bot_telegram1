@@ -5,6 +5,8 @@
 
 import asyncio
 import logging
+import os
+from aiohttp import web
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -137,6 +139,23 @@ async def main():
     
     dp = Dispatcher()
     dp.include_router(router)
+    
+    # ─── DUMMY WEB SERVER UNTUK KOYEB/RENDER/RAILWAY ─────────────
+    # Server cloud membutuhkan aplikasi web yang listen ke $PORT agar tidak di-kill (Crashed in 59s)
+    async def health_check(request):
+        return web.Response(text="Bot Anonymous Chat is running!")
+        
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", 8000))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info(f"🌐 Server kesehatan pengelabui Cloud berjalan di port {port}")
+    # ─────────────────────────────────────────────────────────────
     
     # Jalankan background task
     bg_save = asyncio.create_task(auto_save_task())
