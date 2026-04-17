@@ -13,7 +13,7 @@ except ImportError:
     pass
 
 # ─── TOKEN BOT ──────────────────────────────────────────────
-BOT_TOKEN = os.getenv("BOT_TOKEN", "ISI_TOKEN_KAMU_DISINI_JIKA_TANPA_ENV")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "ISI_TOKEN_KAMU_DISINI_JIKA_TANPA_ENV").strip()
 
 # ─── ADMIN ──────────────────────────────────────────────────
 # Daftar user_id admin (bisa lebih dari satu)
