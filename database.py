@@ -280,3 +280,65 @@ async def get_all_users() -> list[dict]:
     except Exception as e:
         logger.error(f"❌ Gagal get_all_users: {e}")
         return []
+
+
+async def get_user_stats() -> dict:
+    """
+    Hitung statistik agregat semua user dari Firebase.
+    Return dict berisi: total, premium, banned, aktif_hari_ini, total_chat
+    """
+    try:
+        users = await get_all_users()
+        now = datetime.now()
+        
+        total = len(users)
+        premium = sum(1 for u in users if u.get("is_premium"))
+        banned = sum(1 for u in users if u.get("banned"))
+        registered = sum(1 for u in users if u.get("registered"))
+        total_chat = sum(u.get("chat_count", 0) for u in users)
+        
+        # User aktif hari ini = yang updated_at-nya hari ini
+        aktif_hari_ini = 0
+        for u in users:
+            updated_str = u.get("updated_at", "")
+            try:
+                updated = datetime.fromisoformat(updated_str)
+                if updated.date() == now.date():
+                    aktif_hari_ini += 1
+            except Exception:
+                pass
+        
+        # User baru hari ini = created_at hari ini
+        baru_hari_ini = 0
+        for u in users:
+            created_str = u.get("created_at", "")
+            try:
+                created = datetime.fromisoformat(created_str)
+                if created.date() == now.date():
+                    baru_hari_ini += 1
+            except Exception:
+                pass
+        
+        return {
+            "total": total,
+            "registered": registered,
+            "premium": premium,
+            "banned": banned,
+            "total_chat": total_chat,
+            "aktif_hari_ini": aktif_hari_ini,
+            "baru_hari_ini": baru_hari_ini,
+        }
+    except Exception as e:
+        logger.error(f"❌ Gagal get_user_stats: {e}")
+        return {}
+
+
+async def get_premium_users() -> list[dict]:
+    """Ambil daftar semua user premium."""
+    try:
+        db = get_db()
+        docs = db.collection(FIREBASE_COLLECTION).where("is_premium", "==", True).stream()
+        return [doc.to_dict() for doc in docs]
+    except Exception as e:
+        logger.error(f"❌ Gagal get_premium_users: {e}")
+        return []

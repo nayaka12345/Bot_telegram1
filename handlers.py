@@ -257,13 +257,122 @@ async def cmd_setpremium(message: Message):
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message):
-    """[Admin] Lihat statistik server"""
+    """[Admin] Lihat statistik server + user Firebase"""
     if message.from_user.id not in config.ADMIN_IDS:
         return
     
-    stats = match.get_stats()
-    text = utils.format_stats(stats)
+    await message.answer("⏳ Mengambil statistik dari Firebase...")
+    
+    # Stats RAM (realtime)
+    server_stats = match.get_stats()
+    
+    # Stats Firebase (user data)
+    user_stats = await db.get_user_stats()
+    
+    text = (
+        f"📊 *STATISTIK BOT*\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"👥 *USER*\n"
+        f"  Total terdaftar : {user_stats.get('total', 0)}\n"
+        f"  Sudah registrasi: {user_stats.get('registered', 0)}\n"
+        f"  👑 Premium      : {user_stats.get('premium', 0)}\n"
+        f"  ⛔ Banned       : {user_stats.get('banned', 0)}\n"
+        f"  🆕 Baru hari ini: {user_stats.get('baru_hari_ini', 0)}\n"
+        f"  🔥 Aktif hari ini: {user_stats.get('aktif_hari_ini', 0)}\n"
+        f"  💬 Total chat   : {user_stats.get('total_chat', 0)}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"🖥️ *SERVER (Realtime)*\n"
+        f"  ⏳ Antrean      : {server_stats.get('waiting', 0)}\n"
+        f"  💬 Chat aktif   : {server_stats.get('active_chats', 0)}\n"
+        f"  🗄️ Cache RAM    : {server_stats.get('cached_users', 0)}\n"
+        f"  💾 Antri save   : {server_stats.get('dirty_users', 0)}"
+    )
     await message.answer(text, parse_mode="Markdown")
+
+
+@router.message(Command("userinfo"))
+async def cmd_userinfo(message: Message):
+    """[Admin] Lihat detail info satu user. Format: /userinfo <user_id>"""
+    if message.from_user.id not in config.ADMIN_IDS:
+        return
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("Format: /userinfo <user_id>")
+        return
+    
+    try:
+        target_id = int(parts[1])
+    except ValueError:
+        await message.answer("❌ user_id harus berupa angka.")
+        return
+    
+    user = await db.get_user(target_id)
+    if not user:
+        await message.answer(f"❌ User `{target_id}` tidak ditemukan di database.", parse_mode="Markdown")
+        return
+    
+    gender_display = {"male": "👦 Laki-laki", "female": "👧 Perempuan"}.get(user.get("gender"), "❓")
+    purpose_display = {"curhat": "💙 Curhat", "santai": "😄 Santai", "cari_teman": "🤝 Cari Teman"}.get(user.get("purpose"), "❓")
+    premium = "👑 Ya" if user.get("is_premium") else "🆓 Tidak"
+    banned = "⛔ YA" if user.get("banned") else "✅ Tidak"
+    
+    text = (
+        f"🔍 *INFO USER*\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"🆔 ID       : `{target_id}`\n"
+        f"👤 Username : @{user.get('username') or '-'}\n"
+        f"⚧ Gender   : {gender_display}\n"
+        f"🎯 Tujuan   : {purpose_display}\n"
+        f"📍 Provinsi : {user.get('province') or '-'}\n"
+        f"🏙️ Kota     : {user.get('city') or '-'}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"💬 Total chat    : {user.get('chat_count', 0)}\n"
+        f"📅 Chat hari ini : {user.get('daily_count', 0)}\n"
+        f"🔄 Reset count   : {user.get('reset_count', 0)}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"👑 Premium  : {premium}\n"
+        f"⛔ Banned   : {banned}\n"
+        f"📊 Reports  : {user.get('report_count', 0)}\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"📅 Bergabung: {user.get('created_at', '-')[:10]}"
+    )
+    
+    # Tombol aksi cepat untuk user ini
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="👑 Set Premium", callback_data=f"admin_setprem_{target_id}_1"),
+            InlineKeyboardButton(text="❌ Cabut Premium", callback_data=f"admin_setprem_{target_id}_0"),
+        ],
+        [
+            InlineKeyboardButton(text="⛔ Ban", callback_data=f"admin_ban_{target_id}"),
+            InlineKeyboardButton(text="✅ Unban", callback_data=f"admin_unban_{target_id}"),
+        ],
+    ])
+    await message.answer(text, parse_mode="Markdown", reply_markup=kb)
+
+
+@router.message(Command("listpremium"))
+async def cmd_listpremium(message: Message):
+    """[Admin] Lihat daftar semua user premium."""
+    if message.from_user.id not in config.ADMIN_IDS:
+        return
+    
+    await message.answer("⏳ Mengambil daftar user premium...")
+    users = await db.get_premium_users()
+    
+    if not users:
+        await message.answer("Belum ada user premium saat ini.")
+        return
+    
+    lines = [f"👑 *DAFTAR USER PREMIUM* ({len(users)} user)\n━━━━━━━━━━━━━━━━"]
+    for u in users:
+        uid = u.get('user_id', '?')
+        uname = f"@{u['username']}" if u.get('username') else '-'
+        lines.append(f"• `{uid}` {uname} — chat: {u.get('chat_count', 0)}")
+    
+    await message.answer("\n".join(lines), parse_mode="Markdown")
 
 
 # ─── CALLBACK HANDLERS ────────────────────────────────────────
@@ -471,6 +580,46 @@ async def callback_approval(call: CallbackQuery, bot: Bot):
             await bot.send_message(target_id, "❌ Bukti pembayaran kamu ditolak. Silakan lengkapi pembayaran atau hubungi admin.")
         except Exception:
             pass
+
+
+@router.callback_query(F.data.startswith("admin_setprem_"))
+async def callback_admin_setprem(call: CallbackQuery):
+    """[Admin] Set/cabut premium dari tombol /userinfo"""
+    if call.from_user.id not in config.ADMIN_IDS:
+        return
+    parts = call.data.split("_")  # admin_setprem_<id>_<0|1>
+    target_id = int(parts[2])
+    status = parts[3] == "1"
+    
+    await db.set_premium(target_id, status)
+    target_user = match.get_cached_user(target_id)
+    if target_user:
+        match.update_cached_user(target_id, {"is_premium": status})
+    
+    label = "diaktifkan 👑" if status else "dicabut ❌"
+    await call.answer(f"Premium user {target_id} {label}", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("admin_ban_"))
+async def callback_admin_ban(call: CallbackQuery):
+    """[Admin] Ban user dari tombol /userinfo"""
+    if call.from_user.id not in config.ADMIN_IDS:
+        return
+    target_id = int(call.data.replace("admin_ban_", ""))
+    await db.ban_user(target_id)
+    match.update_cached_user(target_id, {"banned": True})
+    await call.answer(f"User {target_id} telah di-ban ⛔", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("admin_unban_"))
+async def callback_admin_unban(call: CallbackQuery):
+    """[Admin] Unban user dari tombol /userinfo"""
+    if call.from_user.id not in config.ADMIN_IDS:
+        return
+    target_id = int(call.data.replace("admin_unban_", ""))
+    await db.unban_user(target_id)
+    match.update_cached_user(target_id, {"banned": False, "report_count": 0})
+    await call.answer(f"User {target_id} berhasil di-unban ✅", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("confirm_"))
