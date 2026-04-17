@@ -33,12 +33,14 @@ LEVEL_THRESHOLDS = {
 }
 
 # ─── LOKASI ─────────────────────────────────────────────────
-PROVINCES = ["DKI Jakarta", "Jawa Barat", "Jawa Tengah", "Jawa Timur", "Lainnya"]
+PROVINCES = ["DKI Jakarta", "Jawa Barat", "Jawa Tengah", "Jawa Timur", "Banten", "Bali", "Lainnya"]
 CITIES = {
     "DKI Jakarta": ["Jakarta Pusat", "Jakarta Selatan", "Jakarta Barat", "Jakarta Timur", "Jakarta Utara"],
-    "Jawa Barat": ["Bekasi", "Bandung", "Depok", "Bogor", "Lainnya"],
-    "Jawa Tengah": ["Semarang", "Solo (Surakarta)", "Yogyakarta", "Magelang", "Lainnya"],
-    "Jawa Timur": ["Surabaya", "Malang", "Sidoarjo", "Kediri", "Lainnya"],
+    "Jawa Barat": ["Bekasi", "Bandung", "Depok", "Bogor", "Cirebon", "Lainnya"],
+    "Jawa Tengah": ["Semarang", "Solo", "Yogyakarta", "Magelang", "Tegal", "Lainnya"],
+    "Jawa Timur": ["Surabaya", "Malang", "Sidoarjo", "Kediri", "Madiun", "Lainnya"],
+    "Banten": ["Tangerang", "Tangsel", "Serang", "Cilegon", "Lainnya"],
+    "Bali": ["Denpasar", "Badung", "Gianyar", "Buleleng", "Lainnya"],
 }
 
 # ─── AUTO SAVE INTERVAL ─────────────────────────────────────
