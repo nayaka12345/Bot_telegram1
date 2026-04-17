@@ -5,6 +5,7 @@
 
 import logging
 import os
+import random
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import CommandStart, Command
@@ -116,11 +117,14 @@ async def cmd_upgrade(message: Message):
     user_id = message.from_user.id
     match.update_cached_user(user_id, {"registration_step": "awaiting_payment_proof"})
     
+    fake_count = random.randint(30, 85)
+    instructions = config.UPGRADE_INSTRUCTIONS.format(fake_count=fake_count)
+    
     if os.path.exists("qris.jpg"):
         photo = FSInputFile("qris.jpg")
-        await message.answer_photo(photo, caption=config.UPGRADE_INSTRUCTIONS, parse_mode="Markdown")
+        await message.answer_photo(photo, caption=instructions, parse_mode="Markdown")
     else:
-        await message.answer(config.UPGRADE_INSTRUCTIONS, parse_mode="Markdown")
+        await message.answer(instructions, parse_mode="Markdown")
 
 
 @router.message(Command("status"))
@@ -300,11 +304,14 @@ async def callback_next(call: CallbackQuery):
 async def callback_upgrade(call: CallbackQuery):
     await call.answer()
     match.update_cached_user(call.from_user.id, {"registration_step": "awaiting_payment_proof"})
+    fake_count = random.randint(30, 85)
+    instructions = config.UPGRADE_INSTRUCTIONS.format(fake_count=fake_count)
+    
     if os.path.exists("qris.jpg"):
         photo = FSInputFile("qris.jpg")
-        await call.message.answer_photo(photo, caption=config.UPGRADE_INSTRUCTIONS, parse_mode="Markdown")
+        await call.message.answer_photo(photo, caption=instructions, parse_mode="Markdown")
     else:
-        await call.message.answer(config.UPGRADE_INSTRUCTIONS, parse_mode="Markdown")
+        await call.message.answer(instructions, parse_mode="Markdown")
 
 
 @router.callback_query(F.data == "action_status")

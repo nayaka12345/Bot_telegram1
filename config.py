@@ -78,14 +78,13 @@ CURHAT_EMPATHY_MESSAGES = [
 # ─── INSTRUKSI UPGRADE PREMIUM ───────────────────────────────
 UPGRADE_INSTRUCTIONS = """
 👑 *UPGRADE KE PREMIUM*
-
+🔥 _{fake_count} orang sudah upgrade ke VIP hari ini!_
 
 Nikmati fitur eksklusif:
-🔥 Cari teman 1 kota
-❤️ Pilih gender
-⚡ Match lebih cepat
-🚫 Tanpa limit chat
-
+✅ Chat unlimited (tanpa batas harian)
+✅ Pilih partner berdasarkan gender
+✅ No ads
+✅ Badge Premium ⭐
 
 💰 *Harga:* Rp 60.000 / bulan
 
